@@ -1,0 +1,189 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Family {
+  id          String       @id @default(uuid())
+  name        String
+  createdAt   DateTime     @default(now()) @map("created_at")
+  parentUsers ParentUser[]
+  children    Child[]
+  rewards     Reward[]
+  learningTasks LearningTask[]
+
+  @@map("families")
+}
+
+enum AuthProvider {
+  PASSWORD
+  GOOGLE
+}
+
+model ParentUser {
+  id           String       @id @default(uuid())
+  familyId     String       @map("family_id")
+  family       Family       @relation(fields: [familyId], references: [id])
+  name         String
+  email        String       @unique
+  passwordHash String?      @map("password_hash")
+  authProvider AuthProvider @default(PASSWORD) @map("auth_provider")
+  googleId     String?      @unique @map("google_id")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@map("parent_users")
+}
+
+model Child {
+  id          String        @id @default(uuid())
+  familyId    String        @map("family_id")
+  family      Family        @relation(fields: [familyId], references: [id])
+  name        String
+  age         Int
+  grade       String?
+  pinHash     String?       @map("pin_hash")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  wallet      PointsWallet?
+  redemptions Redemption[]
+  taskCompletions TaskCompletion[]
+  subjectProgress ChildSubjectProgress[]
+  practiceAttempts PracticeAttempt[]
+
+  @@map("children")
+}
+
+model PointsWallet {
+  id           String              @id @default(uuid())
+  childId      String              @unique @map("child_id")
+  child        Child               @relation(fields: [childId], references: [id])
+  balance      Int                 @default(0)
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  transactions PointsTransaction[]
+
+  @@map("points_wallets")
+}
+
+model PointsTransaction {
+  id        String       @id @default(uuid())
+  walletId  String       @map("wallet_id")
+  wallet    PointsWallet @relation(fields: [walletId], references: [id])
+  amount    Int
+  reason    String
+  createdAt DateTime     @default(now()) @map("created_at")
+  redemption Redemption?
+  taskCompletion TaskCompletion?
+  practiceAttempt PracticeAttempt?
+
+  @@map("points_transactions")
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Question {
+  id                 String            @id @default(uuid())
+  subject            String
+  gradeLevel         Int               @map("grade_level")
+  difficulty         Difficulty
+  questionText       String            @map("question_text")
+  options            String[]
+  correctOptionIndex Int               @map("correct_option_index")
+  explanation        String
+  createdAt          DateTime          @default(now()) @map("created_at")
+  attempts           PracticeAttempt[]
+
+  @@map("questions")
+}
+
+model ChildSubjectProgress {
+  id                 String     @id @default(uuid())
+  childId            String     @map("child_id")
+  child              Child      @relation(fields: [childId], references: [id])
+  subject            String
+  currentGrade       Int        @default(1) @map("current_grade")
+  currentDifficulty  Difficulty @default(MEDIUM) @map("current_difficulty")
+  consecutiveCorrect Int        @default(0) @map("consecutive_correct")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  @@unique([childId, subject])
+  @@map("child_subject_progress")
+}
+
+model PracticeAttempt {
+  id                  String             @id @default(uuid())
+  childId             String             @map("child_id")
+  child               Child              @relation(fields: [childId], references: [id])
+  questionId          String             @map("question_id")
+  question            Question           @relation(fields: [questionId], references: [id])
+  isCorrect           Boolean            @map("is_correct")
+  pointsAwarded       Int                @default(0) @map("points_awarded")
+  pointsTransactionId String?            @unique @map("points_transaction_id")
+  pointsTransaction   PointsTransaction? @relation(fields: [pointsTransactionId], references: [id])
+  createdAt           DateTime           @default(now()) @map("created_at")
+
+  @@map("practice_attempts")
+}
+
+model LearningTask {
+  id           String           @id @default(uuid())
+  familyId     String           @map("family_id")
+  family       Family           @relation(fields: [familyId], references: [id])
+  name         String
+  description  String?
+  subject      String?
+  minAge       Int?             @map("min_age")
+  maxAge       Int?             @map("max_age")
+  rewardPoints Int              @map("reward_points")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  completions  TaskCompletion[]
+
+  @@map("learning_tasks")
+}
+
+model TaskCompletion {
+  id                  String            @id @default(uuid())
+  childId             String            @map("child_id")
+  child               Child             @relation(fields: [childId], references: [id])
+  taskId              String            @map("task_id")
+  task                LearningTask      @relation(fields: [taskId], references: [id])
+  pointsAwarded       Int               @map("points_awarded")
+  pointsTransactionId String            @unique @map("points_transaction_id")
+  pointsTransaction   PointsTransaction @relation(fields: [pointsTransactionId], references: [id])
+  createdAt           DateTime          @default(now()) @map("created_at")
+
+  @@map("task_completions")
+}
+
+model Reward {
+  id          String       @id @default(uuid())
+  familyId    String       @map("family_id")
+  family      Family       @relation(fields: [familyId], references: [id])
+  name        String
+  costPoints  Int          @map("cost_points")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  redemptions Redemption[]
+
+  @@map("rewards")
+}
+
+model Redemption {
+  id                  String            @id @default(uuid())
+  childId             String            @map("child_id")
+  child               Child             @relation(fields: [childId], references: [id])
+  rewardId            String            @map("reward_id")
+  reward              Reward            @relation(fields: [rewardId], references: [id])
+  pointsSpent         Int               @map("points_spent")
+  pointsTransactionId String            @unique @map("points_transaction_id")
+  pointsTransaction   PointsTransaction @relation(fields: [pointsTransactionId], references: [id])
+  createdAt           DateTime          @default(now()) @map("created_at")
+
+  @@map("redemptions")
+}
