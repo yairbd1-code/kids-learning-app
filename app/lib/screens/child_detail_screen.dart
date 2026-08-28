@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../models/child.dart';
 import '../models/points_transaction.dart';
 import '../models/reward.dart';
+import '../models/redemption.dart';
 import '../models/learning_task.dart';
 import '../services/api_service.dart';
 import 'practice_pin_screen.dart';
@@ -23,6 +24,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   late Child _child;
   late int _balance;
   late Future<List<PointsTransaction>> _transactionsFuture;
+  int _pendingRequestsCount = 0;
 
   @override
   void initState() {
@@ -30,12 +32,119 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     _child = widget.child;
     _balance = _child.pointsBalance;
     _transactionsFuture = widget.apiService.fetchTransactions(_child.id);
+    _loadPendingCount();
   }
 
   void _reload() {
     setState(() {
       _transactionsFuture = widget.apiService.fetchTransactions(_child.id);
     });
+    _loadPendingCount();
+  }
+
+  Future<void> _loadPendingCount() async {
+    try {
+      final redemptions = await widget.apiService.fetchRedemptions(_child.id);
+      if (!mounted) return;
+      setState(() {
+        _pendingRequestsCount = redemptions.where((r) => r.status == 'PENDING').length;
+      });
+    } catch (_) {
+      // לא קריטי - רק תג ספירה, לא מציגים שגיאה על זה
+    }
+  }
+
+  Future<void> _openPendingRequestsDialog() async {
+    List<Redemption> redemptions;
+    try {
+      redemptions = await widget.apiService.fetchRedemptions(_child.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('שגיאה: $e')));
+      }
+      return;
+    }
+    final pending = redemptions.where((r) => r.status == 'PENDING').toList();
+
+    if (!mounted) return;
+    if (pending.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('אין כרגע בקשות ממתינות')),
+      );
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            Future<void> respond(Redemption r, bool approve) async {
+              try {
+                final newBalance = await widget.apiService.setRedemptionApproval(
+                  childId: _child.id,
+                  redemptionId: r.id,
+                  approve: approve,
+                );
+                setDialogState(() => pending.remove(r));
+                if (newBalance != null && mounted) {
+                  setState(() => _balance = newBalance);
+                }
+                _reload();
+                if (pending.isEmpty && dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text('שגיאה: $e')),
+                  );
+                }
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('בקשות ממתינות'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: pending.length,
+                  itemBuilder: (context, index) {
+                    final r = pending[index];
+                    return ListTile(
+                      title: Text(r.rewardName),
+                      subtitle: Text('${r.pointsSpent} נקודות'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            tooltip: 'דחייה',
+                            onPressed: () => respond(r, false),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.check, color: Colors.green),
+                            tooltip: 'אישור',
+                            onPressed: () => respond(r, true),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('סגירה'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _openAddTransactionDialog() async {
@@ -587,6 +696,16 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             onPressed: _openRedeemRewardDialog,
             icon: const Icon(Icons.card_giftcard),
             tooltip: 'מימוש פרס',
+          ),
+          IconButton(
+            onPressed: _openPendingRequestsDialog,
+            icon: _pendingRequestsCount > 0
+                ? Badge(
+                    label: Text('$_pendingRequestsCount'),
+                    child: const Icon(Icons.notifications_outlined),
+                  )
+                : const Icon(Icons.notifications_outlined),
+            tooltip: 'בקשות ממתינות',
           ),
           PopupMenuButton<String>(
             onSelected: (value) {

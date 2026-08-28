@@ -13,6 +13,7 @@ import { subjectProgressRouter } from "./routes/subjectProgress";
 import { questionDraftsRouter } from "./routes/questionDrafts";
 import { practiceStatsRouter } from "./routes/practiceStats";
 import { curriculumNotesRouter } from "./routes/curriculumNotes";
+import { childStoreRouter } from "./routes/childStore";
 import { requireAuth, requireChildAuth } from "./auth/middleware";
 
 const app = express();
@@ -32,6 +33,7 @@ app.use("/children/:childId/practice-stats", requireAuth, practiceStatsRouter);
 app.use("/children/:childId/curriculum-notes", requireAuth, curriculumNotesRouter);
 app.use("/question-drafts", requireAuth, questionDraftsRouter);
 app.use("/practice", requireChildAuth, practiceRouter);
+app.use("/store", requireChildAuth, childStoreRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });

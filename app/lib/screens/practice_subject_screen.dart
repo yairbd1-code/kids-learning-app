@@ -41,17 +41,7 @@ class _PracticeSubjectScreenState extends State<PracticeSubjectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('באיזה מקצוע נתרגל?'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-            icon: const Icon(Icons.close),
-            tooltip: 'סיום תרגול',
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('באיזה מקצוע נתרגל?')),
       body: FutureBuilder<List<String>>(
         future: _subjectsFuture,
         builder: (context, snapshot) {

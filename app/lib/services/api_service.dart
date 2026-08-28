@@ -344,6 +344,25 @@ class ApiService {
     return data['newBalance'] as int;
   }
 
+  Future<int?> setRedemptionApproval({
+    required String childId,
+    required String redemptionId,
+    required bool approve,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$apiBaseUrl/children/$childId/redemptions/$redemptionId'),
+      headers: _authHeaders,
+      body: jsonEncode({'approve': approve}),
+    );
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception((data['error'] as String?) ?? 'שגיאה בעדכון הבקשה');
+    }
+
+    return data['newBalance'] as int?;
+  }
+
   Future<void> setChildPin({required String childId, required String pin}) async {
     final response = await http.post(
       Uri.parse('$apiBaseUrl/children/$childId/pin'),

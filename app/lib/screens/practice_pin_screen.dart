@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/child.dart';
 import '../services/api_service.dart';
-import 'practice_subject_screen.dart';
+import 'child_home_screen.dart';
 
 class PracticePinScreen extends StatefulWidget {
   final ApiService apiService;
@@ -45,7 +45,7 @@ class _PracticePinScreenState extends State<PracticePinScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => PracticeSubjectScreen(session: session),
+          builder: (context) => ChildHomeScreen(session: session),
         ),
       );
     } catch (e) {
@@ -69,7 +69,7 @@ class _PracticePinScreenState extends State<PracticePinScreen> {
             children: [
               const Icon(Icons.lock_outline, size: 64),
               const SizedBox(height: 16),
-              const Text('הזינו את קוד ה-PIN שלכם כדי להתחיל תרגול',
+              const Text('הזינו את קוד ה-PIN שלכם כדי להיכנס',
                   textAlign: TextAlign.center),
               const SizedBox(height: 24),
               TextField(
