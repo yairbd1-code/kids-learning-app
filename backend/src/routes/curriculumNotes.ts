@@ -73,9 +73,12 @@ curriculumNotesRouter.post("/from-image", imageJsonParser, async (req, res) => {
   if (typeof imageBase64 !== "string" || imageBase64.length === 0) {
     return res.status(400).json({ error: "imageBase64 is required" });
   }
-  const validMediaTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (typeof mediaType !== "string" || !validMediaTypes.includes(mediaType)) {
-    return res.status(400).json({ error: "mediaType must be image/jpeg, image/png, or image/webp" });
+  const validImageTypes = ["image/jpeg", "image/png", "image/webp"];
+  const isPdf = mediaType === "application/pdf";
+  if (typeof mediaType !== "string" || !(validImageTypes.includes(mediaType) || isPdf)) {
+    return res
+      .status(400)
+      .json({ error: "mediaType must be image/jpeg, image/png, image/webp, or application/pdf" });
   }
 
   const client = getAnthropicClient();
@@ -85,9 +88,18 @@ curriculumNotesRouter.post("/from-image", imageJsonParser, async (req, res) => {
     });
   }
 
-  // חשוב: bytes התמונה לא נשמרים ב-DB ולא לדיסק בשום שלב — הם מועברים
+  const promptText =
+    (isPdf
+      ? "זה קובץ (עמוד אחד או יותר) מספר לימוד או רשימת נושאים לבית ספר."
+      : "זו תמונה של דף מספר לימוד או רשימת נושאים לבית ספר.") +
+    " תאר בכמה משפטים " +
+    "בעברית מה החומר הלימודי שמופיע כאן (נושאים, פרקים, מושגים מרכזיים) - " +
+    "כך שאפשר יהיה להשתמש בתיאור כדי ליצור שאלות תרגול מתאימות. אם אין " +
+    "בו תוכן לימודי רלוונטי, כתוב \"לא זוהה תוכן לימודי בקובץ\".";
+
+  // חשוב: bytes הקובץ/תמונה לא נשמרים ב-DB ולא לדיסק בשום שלב — הם מועברים
   // ל-Claude לעיבוד ונשמטים מהזיכרון מיד אחרי סוף הבקשה, בהתאם למה שסוכם
-  // (למחוק את התמונה מיד אחרי הקריאה).
+  // (למחוק את התמונה/הקובץ מיד אחרי הקריאה).
   let extractedText: string;
   try {
     const message = await client.messages.create({
@@ -97,17 +109,22 @@ curriculumNotesRouter.post("/from-image", imageJsonParser, async (req, res) => {
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/webp", data: imageBase64 },
-            },
+            isPdf
+              ? {
+                  type: "document",
+                  source: { type: "base64", media_type: "application/pdf", data: imageBase64 },
+                }
+              : {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: mediaType as "image/jpeg" | "image/png" | "image/webp",
+                    data: imageBase64,
+                  },
+                },
             {
               type: "text",
-              text:
-                "זו תמונה של דף מספר לימוד או רשימת נושאים לבית ספר. תאר בכמה משפטים " +
-                "בעברית מה החומר הלימודי שמופיע כאן (נושאים, פרקים, מושגים מרכזיים) - " +
-                "כך שאפשר יהיה להשתמש בתיאור כדי ליצור שאלות תרגול מתאימות. אם אין " +
-                "בתמונה תוכן לימודי רלוונטי, כתוב \"לא זוהה תוכן לימודי בתמונה\".",
+              text: promptText,
             },
           ],
         },
@@ -119,12 +136,12 @@ curriculumNotesRouter.post("/from-image", imageJsonParser, async (req, res) => {
     }
     extractedText = textBlock.text.trim();
   } catch (e) {
-    console.error("Curriculum image OCR failed:", e);
-    return res.status(502).json({ error: "קריאת התמונה נכשלה, נסו שוב" });
+    console.error("Curriculum file OCR failed:", e);
+    return res.status(502).json({ error: "קריאת הקובץ נכשלה, נסו שוב" });
   }
 
   const note = await prisma.childCurriculumNote.create({
-    data: { childId, subject, noteText: extractedText, source: "photo" },
+    data: { childId, subject, noteText: extractedText, source: isPdf ? "file" : "photo" },
   });
 
   res.status(201).json(note);

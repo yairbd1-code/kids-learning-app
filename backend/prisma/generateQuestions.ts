@@ -121,7 +121,7 @@ async function generateBatch(
 
   const message = await anthropic.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 4096,
+    max_tokens: 8192,
     messages: [{ role: "user", content: prompt }],
   });
   const textBlock = message.content.find((block) => block.type === "text");
