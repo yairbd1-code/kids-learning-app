@@ -18,19 +18,25 @@ class _AiContentScreenState extends State<AiContentScreen> {
   String _difficulty = 'MEDIUM';
   int _count = 5;
   bool _isGenerating = false;
+  String _listStatus = 'pending';
 
-  late Future<List<QuestionDraft>> _pendingFuture;
+  late Future<List<QuestionDraft>> _listFuture;
 
   @override
   void initState() {
     super.initState();
-    _pendingFuture = widget.apiService.fetchQuestionDrafts(status: 'pending');
+    _listFuture = widget.apiService.fetchQuestionDrafts(status: _listStatus);
   }
 
   void _reload() {
     setState(() {
-      _pendingFuture = widget.apiService.fetchQuestionDrafts(status: 'pending');
+      _listFuture = widget.apiService.fetchQuestionDrafts(status: _listStatus);
     });
+  }
+
+  void _switchStatus(String status) {
+    setState(() => _listStatus = status);
+    _reload();
   }
 
   Future<void> _generate() async {
@@ -77,6 +83,28 @@ class _AiContentScreenState extends State<AiContentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('שגיאה: $e')));
       }
     }
+  }
+
+  Future<void> _remove(QuestionDraft draft) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('הסרת שאלה'),
+        content: const Text('להסיר את השאלה הזו מהתרגול של הילדים?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('ביטול'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('הסרה'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _reject(draft);
   }
 
   @override
@@ -162,10 +190,17 @@ class _AiContentScreenState extends State<AiContentScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          Text('שאלות ממתינות לאישור', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'pending', label: Text('ממתינות לאישור')),
+              ButtonSegment(value: 'approved', label: Text('כבר אושרו')),
+            ],
+            selected: {_listStatus},
+            onSelectionChanged: (selection) => _switchStatus(selection.first),
+          ),
+          const SizedBox(height: 12),
           FutureBuilder<List<QuestionDraft>>(
-            future: _pendingFuture,
+            future: _listFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Padding(
@@ -182,17 +217,22 @@ class _AiContentScreenState extends State<AiContentScreen> {
 
               final drafts = snapshot.data ?? [];
               if (drafts.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('אין כרגע שאלות ממתינות לאישור.'),
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    _listStatus == 'pending'
+                        ? 'אין כרגע שאלות ממתינות לאישור.'
+                        : 'עדיין לא אושרו שאלות AI למשפחה הזו.',
+                  ),
                 );
               }
 
               return Column(
                 children: drafts.map((draft) => _DraftCard(
                       draft: draft,
-                      onApprove: () => _approve(draft),
-                      onReject: () => _reject(draft),
+                      onApprove: _listStatus == 'pending' ? () => _approve(draft) : null,
+                      onReject: _listStatus == 'pending' ? () => _reject(draft) : null,
+                      onRemove: _listStatus == 'approved' ? () => _remove(draft) : null,
                     )).toList(),
               );
             },
@@ -205,10 +245,11 @@ class _AiContentScreenState extends State<AiContentScreen> {
 
 class _DraftCard extends StatelessWidget {
   final QuestionDraft draft;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+  final VoidCallback? onRemove;
 
-  const _DraftCard({required this.draft, required this.onApprove, required this.onReject});
+  const _DraftCard({required this.draft, this.onApprove, this.onReject, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -256,23 +297,33 @@ class _DraftCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text('הסבר: ${draft.explanation}', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onReject,
-                    child: const Text('דחייה'),
-                  ),
+            if (onRemove != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('הסרה'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: onApprove,
-                    child: const Text('אישור'),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onReject,
+                      child: const Text('דחייה'),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: onApprove,
+                      child: const Text('אישור'),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
