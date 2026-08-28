@@ -8,6 +8,8 @@ import '../models/learning_task.dart';
 import '../models/task_completion.dart';
 import '../models/subject_progress.dart';
 import '../models/question_draft.dart';
+import '../models/practice_stats.dart';
+import '../models/curriculum_note.dart';
 import 'auth_service.dart';
 
 class ChildSession {
@@ -65,11 +67,15 @@ class ApiService {
     String? name,
     int? age,
     String? grade,
+    List<String>? disabledSubjects,
+    Map<String, int>? subjectWeights,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (age != null) body['age'] = age;
     if (grade != null) body['grade'] = grade;
+    if (disabledSubjects != null) body['disabledSubjects'] = disabledSubjects;
+    if (subjectWeights != null) body['subjectWeights'] = subjectWeights;
 
     final response = await http.patch(
       Uri.parse('$apiBaseUrl/children/$childId'),
@@ -405,6 +411,20 @@ class ApiService {
     return SubjectProgress.fromJson(data);
   }
 
+  Future<List<PracticeStats>> fetchPracticeStats(String childId) async {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/children/$childId/practice-stats'),
+      headers: _authHeaders,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('שגיאה בטעינת נתוני ההתקדמות (${response.statusCode})');
+    }
+
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.map((json) => PracticeStats.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
   Future<List<QuestionDraft>> fetchQuestionDrafts({String? status}) async {
     final uri = Uri.parse('$apiBaseUrl/question-drafts').replace(
       queryParameters: status != null ? {'status': status} : null,
@@ -424,6 +444,7 @@ class ApiService {
     required int gradeLevel,
     required String difficulty,
     required int count,
+    String? childId,
   }) async {
     final response = await http.post(
       Uri.parse('$apiBaseUrl/question-drafts/generate'),
@@ -433,6 +454,7 @@ class ApiService {
         'gradeLevel': gradeLevel,
         'difficulty': difficulty,
         'count': count,
+        'childId': ?childId,
       }),
     );
 
@@ -443,6 +465,37 @@ class ApiService {
 
     final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
     return data.map((json) => QuestionDraft.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<QuestionDraft> addManualQuestion({
+    required String subject,
+    required int gradeLevel,
+    required String difficulty,
+    required String questionText,
+    required List<String> options,
+    required int correctOptionIndex,
+    required String explanation,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/question-drafts/manual'),
+      headers: _authHeaders,
+      body: jsonEncode({
+        'subject': subject,
+        'gradeLevel': gradeLevel,
+        'difficulty': difficulty,
+        'questionText': questionText,
+        'options': options,
+        'correctOptionIndex': correctOptionIndex,
+        'explanation': explanation,
+      }),
+    );
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 201) {
+      throw Exception((data['error'] as String?) ?? 'שגיאה בהוספת השאלה');
+    }
+
+    return QuestionDraft.fromJson(data);
   }
 
   Future<QuestionDraft> setQuestionDraftApproved({
@@ -472,6 +525,69 @@ class ApiService {
     if (response.statusCode != 204) {
       final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
       throw Exception((data['error'] as String?) ?? 'שגיאה במחיקת השאלה');
+    }
+  }
+
+  Future<List<CurriculumNote>> fetchCurriculumNotes(String childId) async {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/children/$childId/curriculum-notes'),
+      headers: _authHeaders,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('שגיאה בטעינת חומר הלימוד (${response.statusCode})');
+    }
+
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.map((json) => CurriculumNote.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<CurriculumNote> addCurriculumNote({
+    required String childId,
+    required String subject,
+    required String noteText,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/children/$childId/curriculum-notes'),
+      headers: _authHeaders,
+      body: jsonEncode({'subject': subject, 'noteText': noteText}),
+    );
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 201) {
+      throw Exception((data['error'] as String?) ?? 'שגיאה בהוספת החומר');
+    }
+    return CurriculumNote.fromJson(data);
+  }
+
+  Future<CurriculumNote> addCurriculumNoteFromImage({
+    required String childId,
+    required String subject,
+    required String imageBase64,
+    required String mediaType,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/children/$childId/curriculum-notes/from-image'),
+      headers: _authHeaders,
+      body: jsonEncode({'subject': subject, 'imageBase64': imageBase64, 'mediaType': mediaType}),
+    );
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 201) {
+      throw Exception((data['error'] as String?) ?? 'שגיאה בקריאת התמונה');
+    }
+    return CurriculumNote.fromJson(data);
+  }
+
+  Future<void> deleteCurriculumNote({required String childId, required String noteId}) async {
+    final response = await http.delete(
+      Uri.parse('$apiBaseUrl/children/$childId/curriculum-notes/$noteId'),
+      headers: _authHeaders,
+    );
+
+    if (response.statusCode != 204) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      throw Exception((data['error'] as String?) ?? 'שגיאה במחיקת החומר');
     }
   }
 }

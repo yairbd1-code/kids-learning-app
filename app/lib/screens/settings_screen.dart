@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,16 +13,19 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late Future<ProfileInfo> _profileFuture;
+  late Future<List<FamilyMember>> _membersFuture;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = widget.authService.fetchProfile();
+    _membersFuture = widget.authService.fetchFamilyMembers();
   }
 
   void _reload() {
     setState(() {
       _profileFuture = widget.authService.fetchProfile();
+      _membersFuture = widget.authService.fetchFamilyMembers();
     });
   }
 
@@ -214,6 +218,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 title: const Text('שם המשפחה'),
                 subtitle: Text(profile.familyName),
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('קוד משפחה'),
+                subtitle: Text(
+                  '${profile.joinCode}\nשתפו את הקוד עם בן/בת הזוג כדי שיוכלו להצטרף לאותה משפחה',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.copy),
+                  tooltip: 'העתקת הקוד',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: profile.joinCode));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('הקוד הועתק')),
+                    );
+                  },
+                ),
+              ),
+              FutureBuilder<List<FamilyMember>>(
+                future: _membersFuture,
+                builder: (context, snapshot) {
+                  final members = snapshot.data ?? [];
+                  if (members.length <= 1) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('בני המשפחה עם גישה', style: Theme.of(context).textTheme.labelLarge),
+                        ...members.map(
+                          (m) => Text('${m.name} · ${m.email}',
+                              style: Theme.of(context).textTheme.bodySmall),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               const Divider(),
               ListTile(

@@ -160,6 +160,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              if (widget.subject == mixedSubjectValue) ...[
+                Chip(label: Text(subjectLabel(question.subject))),
+                const SizedBox(width: 8),
+              ],
               Chip(label: Text(gradeLabel(question.gradeLevel))),
               const SizedBox(width: 8),
               Chip(label: Text(difficultyLabel(question.difficulty))),
@@ -185,7 +189,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
             );
           }),
-          if (widget.subject == 'math') ...[
+          if (question.subject == 'math') ...[
             const SizedBox(height: 12),
             Text('מחברת טיוטה (לא נשמר)', style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 4),

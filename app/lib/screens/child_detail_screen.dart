@@ -7,6 +7,7 @@ import '../models/learning_task.dart';
 import '../services/api_service.dart';
 import 'practice_pin_screen.dart';
 import 'subject_progress_screen.dart';
+import 'curriculum_notes_screen.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   final ApiService apiService;
@@ -495,6 +496,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
             grade: _child.grade,
             pointsBalance: _child.pointsBalance,
             hasPin: true,
+            disabledSubjects: _child.disabledSubjects,
+            subjectWeights: _child.subjectWeights,
           ));
     }
     return success;
@@ -520,6 +523,15 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       MaterialPageRoute(
         builder: (context) =>
             SubjectProgressScreen(apiService: widget.apiService, child: _child),
+      ),
+    );
+  }
+
+  void _openCurriculumNotes() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) =>
+            CurriculumNotesScreen(apiService: widget.apiService, child: _child),
       ),
     );
   }
@@ -581,6 +593,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               if (value == 'edit') _openEditChildDialog();
               if (value == 'pin') _openSetPinDialog();
               if (value == 'progress') _openSubjectProgress();
+              if (value == 'curriculum') _openCurriculumNotes();
               if (value == 'delete') _confirmDeleteChild();
             },
             itemBuilder: (context) => [
@@ -590,6 +603,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                 child: Text(_child.hasPin ? 'שינוי קוד PIN' : 'הגדרת קוד PIN'),
               ),
               const PopupMenuItem(value: 'progress', child: Text('רמת לימוד ותרגול')),
+              const PopupMenuItem(value: 'curriculum', child: Text('ספרי לימוד לשנה')),
               const PopupMenuItem(value: 'delete', child: Text('מחיקת ילד')),
             ],
           ),

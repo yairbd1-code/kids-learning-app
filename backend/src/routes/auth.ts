@@ -13,6 +13,30 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// תווים ללא אותיות/ספרות דו-משמעיות (0/O, 1/I) כדי שקוד המשפחה יהיה קריא וקל
+// להקלדה בין ההורים.
+const JOIN_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function generateJoinCode(): string {
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += JOIN_CODE_CHARS[Math.floor(Math.random() * JOIN_CODE_CHARS.length)];
+  }
+  return code;
+}
+
+async function createFamilyWithUniqueJoinCode(name: string) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.family.create({ data: { name, joinCode: generateJoinCode() } });
+    } catch (e) {
+      const isUniqueConflict = (e as { code?: string })?.code === "P2002";
+      if (!isUniqueConflict || attempt === 4) throw e;
+    }
+  }
+  throw new Error("Failed to generate a unique family join code");
+}
+
 authRouter.post("/register", async (req, res) => {
   const { familyName, parentName, email, password } = req.body;
 
@@ -38,17 +62,14 @@ authRouter.post("/register", async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const { family, parent } = await prisma.$transaction(async (tx) => {
-    const family = await tx.family.create({ data: { name: familyName.trim() } });
-    const parent = await tx.parentUser.create({
-      data: {
-        familyId: family.id,
-        name: parentName.trim(),
-        email: normalizedEmail,
-        passwordHash,
-      },
-    });
-    return { family, parent };
+  const family = await createFamilyWithUniqueJoinCode(familyName.trim());
+  const parent = await prisma.parentUser.create({
+    data: {
+      familyId: family.id,
+      name: parentName.trim(),
+      email: normalizedEmail,
+      passwordHash,
+    },
   });
 
   const token = signAuthToken({ parentId: parent.id, familyId: family.id });
@@ -56,7 +77,55 @@ authRouter.post("/register", async (req, res) => {
   res.status(201).json({
     token,
     parent: { id: parent.id, name: parent.name, email: parent.email },
-    family: { id: family.id, name: family.name },
+    family: { id: family.id, name: family.name, joinCode: family.joinCode },
+  });
+});
+
+authRouter.post("/join", async (req, res) => {
+  const { joinCode, parentName, email, password } = req.body;
+
+  if (typeof joinCode !== "string" || joinCode.trim().length === 0) {
+    return res.status(400).json({ error: "joinCode is required" });
+  }
+  if (typeof parentName !== "string" || parentName.trim().length === 0) {
+    return res.status(400).json({ error: "parentName is required" });
+  }
+  if (typeof email !== "string" || !isValidEmail(email)) {
+    return res.status(400).json({ error: "A valid email is required" });
+  }
+  if (typeof password !== "string" || password.length < 8) {
+    return res.status(400).json({ error: "password must be at least 8 characters" });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedCode = joinCode.trim().toUpperCase();
+
+  const family = await prisma.family.findUnique({ where: { joinCode: normalizedCode } });
+  if (!family) {
+    return res.status(404).json({ error: "קוד משפחה שגוי" });
+  }
+
+  const existing = await prisma.parentUser.findUnique({ where: { email: normalizedEmail } });
+  if (existing) {
+    return res.status(409).json({ error: "Email is already registered" });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const parent = await prisma.parentUser.create({
+    data: {
+      familyId: family.id,
+      name: parentName.trim(),
+      email: normalizedEmail,
+      passwordHash,
+    },
+  });
+
+  const token = signAuthToken({ parentId: parent.id, familyId: family.id });
+
+  res.status(201).json({
+    token,
+    parent: { id: parent.id, name: parent.name, email: parent.email },
+    family: { id: family.id, name: family.name, joinCode: family.joinCode },
   });
 });
 
@@ -96,7 +165,7 @@ authRouter.post("/login", async (req, res) => {
   res.json({
     token,
     parent: { id: parent.id, name: parent.name, email: parent.email },
-    family: { id: parent.family.id, name: parent.family.name },
+    family: { id: parent.family.id, name: parent.family.name, joinCode: parent.family.joinCode },
   });
 });
 
@@ -145,7 +214,7 @@ authRouter.post("/google", async (req, res) => {
         include: { family: true },
       });
     } else {
-      const family = await prisma.family.create({ data: { name: `המשפחה של ${name}` } });
+      const family = await createFamilyWithUniqueJoinCode(`המשפחה של ${name}`);
       parent = await prisma.parentUser.create({
         data: {
           familyId: family.id,
@@ -164,7 +233,7 @@ authRouter.post("/google", async (req, res) => {
   res.json({
     token,
     parent: { id: parent.id, name: parent.name, email: parent.email },
-    family: { id: parent.family.id, name: parent.family.name },
+    family: { id: parent.family.id, name: parent.family.name, joinCode: parent.family.joinCode },
   });
 });
 
@@ -180,7 +249,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
 
   res.json({
     parent: { id: parent.id, name: parent.name, email: parent.email },
-    family: { id: parent.family.id, name: parent.family.name },
+    family: { id: parent.family.id, name: parent.family.name, joinCode: parent.family.joinCode },
   });
 });
 
@@ -243,6 +312,24 @@ authRouter.patch("/me", requireAuth, async (req, res) => {
 
   res.json({
     parent: { id: updated.id, name: updated.name, email: updated.email },
-    family: { id: family.id, name: family.name },
+    family: { id: family.id, name: family.name, joinCode: family.joinCode },
   });
+});
+
+authRouter.get("/family-members", requireAuth, async (req, res) => {
+  const familyId = req.auth!.familyId;
+
+  const members = await prisma.parentUser.findMany({
+    where: { familyId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  res.json(
+    members.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      authProvider: m.authProvider,
+    })),
+  );
 });

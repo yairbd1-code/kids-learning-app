@@ -15,14 +15,17 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
+enum _AuthMode { login, register, join }
+
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _familyNameController = TextEditingController();
   final _parentNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _joinCodeController = TextEditingController();
 
-  bool _isRegisterMode = false;
+  _AuthMode _mode = _AuthMode.login;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -97,6 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _parentNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _joinCodeController.dispose();
     super.dispose();
   }
 
@@ -109,18 +113,26 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      if (_isRegisterMode) {
-        await widget.authService.register(
-          familyName: _familyNameController.text.trim(),
-          parentName: _parentNameController.text.trim(),
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
-      } else {
-        await widget.authService.login(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+      switch (_mode) {
+        case _AuthMode.register:
+          await widget.authService.register(
+            familyName: _familyNameController.text.trim(),
+            parentName: _parentNameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+        case _AuthMode.join:
+          await widget.authService.joinFamily(
+            joinCode: _joinCodeController.text.trim(),
+            parentName: _parentNameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+        case _AuthMode.login:
+          await widget.authService.login(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
       }
       widget.onAuthenticated();
     } catch (e) {
@@ -132,8 +144,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final title = switch (_mode) {
+      _AuthMode.login => 'התחברות',
+      _AuthMode.register => 'הרשמה',
+      _AuthMode.join => 'הצטרפות למשפחה',
+    };
+    final submitLabel = switch (_mode) {
+      _AuthMode.login => 'התחברות',
+      _AuthMode.register => 'הרשמה',
+      _AuthMode.join => 'הצטרפות',
+    };
+
     return Scaffold(
-      appBar: AppBar(title: Text(_isRegisterMode ? 'הרשמה' : 'התחברות')),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -144,13 +167,27 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_isRegisterMode) ...[
+                  if (_mode == _AuthMode.register) ...[
                     TextFormField(
                       controller: _familyNameController,
                       decoration: const InputDecoration(labelText: 'שם המשפחה'),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'שדה חובה' : null,
                     ),
                     const SizedBox(height: 12),
+                  ],
+                  if (_mode == _AuthMode.join) ...[
+                    TextFormField(
+                      controller: _joinCodeController,
+                      decoration: const InputDecoration(
+                        labelText: 'קוד משפחה',
+                        helperText: 'תקבלו את זה מבן/בת הזוג, במסך ההגדרות שלהם',
+                      ),
+                      textCapitalization: TextCapitalization.characters,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'שדה חובה' : null,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (_mode == _AuthMode.register || _mode == _AuthMode.join) ...[
                     TextFormField(
                       controller: _parentNameController,
                       decoration: const InputDecoration(labelText: 'השם שלך'),
@@ -190,16 +227,37 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(_isRegisterMode ? 'הרשמה' : 'התחברות'),
+                        : Text(submitLabel),
                   ),
-                  TextButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => setState(() {
-                              _isRegisterMode = !_isRegisterMode;
-                              _errorMessage = null;
-                            }),
-                    child: Text(_isRegisterMode ? 'כבר יש לך חשבון? התחברות' : 'משפחה חדשה? הרשמה'),
+                  if (_mode == _AuthMode.login)
+                    TextButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => setState(() {
+                                _mode = _AuthMode.register;
+                                _errorMessage = null;
+                              }),
+                      child: const Text('משפחה חדשה? הרשמה'),
+                    )
+                  else
+                    TextButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => setState(() {
+                                _mode = _AuthMode.login;
+                                _errorMessage = null;
+                              }),
+                      child: const Text('כבר יש לך חשבון? התחברות'),
+                    ),
+                  if (_mode != _AuthMode.join)
+                    TextButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => setState(() {
+                                _mode = _AuthMode.join;
+                                _errorMessage = null;
+                              }),
+                      child: const Text('קיבלת קוד משפחה? הצטרפות'),
                   ),
                   if (_googleSignInEnabled && _googleReady) ...[
                     const SizedBox(height: 12),

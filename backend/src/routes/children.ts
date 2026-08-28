@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../prisma";
 import { signChildToken } from "../auth/jwt";
+import { ALLOWED_SUBJECTS } from "./practice";
 
 export const childrenRouter = Router();
 
@@ -11,6 +12,8 @@ function serializeChild(child: {
   age: number;
   grade: string | null;
   pinHash: string | null;
+  disabledSubjects: string[];
+  subjectWeights: unknown;
   wallet: { balance: number } | null;
 }) {
   return {
@@ -20,7 +23,28 @@ function serializeChild(child: {
     grade: child.grade,
     pointsBalance: child.wallet?.balance ?? 0,
     hasPin: child.pinHash !== null,
+    disabledSubjects: child.disabledSubjects,
+    subjectWeights: child.subjectWeights ?? null,
   };
+}
+
+function isValidSubjectList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((s) => typeof s === "string" && (ALLOWED_SUBJECTS as readonly string[]).includes(s))
+  );
+}
+
+function isValidSubjectWeights(value: unknown): value is Record<string, number> {
+  if (value === null) return true;
+  if (typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.entries(value as Record<string, unknown>).every(
+    ([subject, weight]) =>
+      (ALLOWED_SUBJECTS as readonly string[]).includes(subject) &&
+      typeof weight === "number" &&
+      Number.isInteger(weight) &&
+      weight >= 0,
+  );
 }
 
 childrenRouter.get("/", async (req, res) => {
@@ -66,7 +90,7 @@ childrenRouter.post("/", async (req, res) => {
 childrenRouter.patch("/:childId", async (req, res) => {
   const familyId = req.auth!.familyId;
   const { childId } = req.params;
-  const { name, age, grade } = req.body;
+  const { name, age, grade, disabledSubjects, subjectWeights } = req.body;
 
   const existing = await prisma.child.findFirst({ where: { id: childId, familyId } });
   if (!existing) {
@@ -85,6 +109,14 @@ childrenRouter.patch("/:childId", async (req, res) => {
   if (grade !== undefined && grade !== null && typeof grade !== "string") {
     return res.status(400).json({ error: "grade must be a string" });
   }
+  if (disabledSubjects !== undefined && !isValidSubjectList(disabledSubjects)) {
+    return res.status(400).json({ error: "disabledSubjects must be an array of known subjects" });
+  }
+  if (subjectWeights !== undefined && !isValidSubjectWeights(subjectWeights)) {
+    return res.status(400).json({
+      error: "subjectWeights must be null or an object mapping known subjects to non-negative integers",
+    });
+  }
 
   const child = await prisma.child.update({
     where: { id: childId },
@@ -92,6 +124,8 @@ childrenRouter.patch("/:childId", async (req, res) => {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(age !== undefined ? { age } : {}),
       ...(grade !== undefined ? { grade } : {}),
+      ...(disabledSubjects !== undefined ? { disabledSubjects } : {}),
+      ...(subjectWeights !== undefined ? { subjectWeights } : {}),
     },
     include: { wallet: true },
   });
@@ -114,6 +148,7 @@ childrenRouter.delete("/:childId", async (req, res) => {
   await prisma.$transaction(async (tx) => {
     await tx.practiceAttempt.deleteMany({ where: { childId } });
     await tx.childSubjectProgress.deleteMany({ where: { childId } });
+    await tx.childCurriculumNote.deleteMany({ where: { childId } });
     await tx.taskCompletion.deleteMany({ where: { childId } });
     await tx.redemption.deleteMany({ where: { childId } });
     if (child.wallet) {

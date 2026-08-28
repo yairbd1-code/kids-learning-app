@@ -11,6 +11,8 @@ import { taskCompletionsRouter } from "./routes/taskCompletions";
 import { practiceRouter } from "./routes/practice";
 import { subjectProgressRouter } from "./routes/subjectProgress";
 import { questionDraftsRouter } from "./routes/questionDrafts";
+import { practiceStatsRouter } from "./routes/practiceStats";
+import { curriculumNotesRouter } from "./routes/curriculumNotes";
 import { requireAuth, requireChildAuth } from "./auth/middleware";
 
 const app = express();
@@ -26,6 +28,8 @@ app.use("/rewards", requireAuth, rewardsRouter);
 app.use("/learning-tasks", requireAuth, learningTasksRouter);
 app.use("/children/:childId/task-completions", requireAuth, taskCompletionsRouter);
 app.use("/children/:childId/subject-progress", requireAuth, subjectProgressRouter);
+app.use("/children/:childId/practice-stats", requireAuth, practiceStatsRouter);
+app.use("/children/:childId/curriculum-notes", requireAuth, curriculumNotesRouter);
 app.use("/question-drafts", requireAuth, questionDraftsRouter);
 app.use("/practice", requireChildAuth, practiceRouter);
 

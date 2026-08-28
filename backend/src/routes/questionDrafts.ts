@@ -94,7 +94,7 @@ questionDraftsRouter.get("/", async (req, res) => {
 
 questionDraftsRouter.post("/generate", async (req, res) => {
   const familyId = req.auth!.familyId;
-  const { subject, gradeLevel, difficulty, count } = req.body;
+  const { subject, gradeLevel, difficulty, count, childId } = req.body;
 
   if (!(ALLOWED_SUBJECTS as readonly string[]).includes(subject)) {
     return res.status(400).json({ error: "Unknown subject" });
@@ -109,12 +109,34 @@ questionDraftsRouter.post("/generate", async (req, res) => {
   if (!Number.isInteger(requestedCount) || requestedCount < MIN_COUNT || requestedCount > MAX_COUNT) {
     return res.status(400).json({ error: `count must be an integer between ${MIN_COUNT} and ${MAX_COUNT}` });
   }
+  if (childId !== undefined && typeof childId !== "string") {
+    return res.status(400).json({ error: "childId must be a string" });
+  }
 
   const client = getAnthropicClient();
   if (!client) {
     return res.status(503).json({
       error: "יצירת שאלות עם AI לא מוגדרת עדיין בשרת (חסר ANTHROPIC_API_KEY).",
     });
+  }
+
+  let curriculumContext = "";
+  if (typeof childId === "string") {
+    const child = await prisma.child.findFirst({ where: { id: childId, familyId } });
+    if (!child) {
+      return res.status(404).json({ error: "Child not found" });
+    }
+    const notes = await prisma.childCurriculumNote.findMany({
+      where: { childId, subject },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    });
+    if (notes.length > 0) {
+      curriculumContext =
+        `\nהחומר הספציפי שהילד/ה לומד/ת השנה במקצוע זה (מספרי הלימוד שלו/ה בפועל):\n` +
+        notes.map((n) => `- ${n.noteText}`).join("\n") +
+        `\nהתאם את השאלות לחומר הזה ככל האפשר, ולא רק לרמת הכיתה הכללית.\n`;
+    }
   }
 
   const gradeLabel = GRADE_LABELS[gradeLevel - 1];
@@ -124,7 +146,7 @@ questionDraftsRouter.post("/generate", async (req, res) => {
   const prompt = `אתה עוזר להכין שאלות תרגול לילדים ישראלים בבית ספר יסודי/חטיבת ביניים.
 
 צור בדיוק ${requestedCount} שאלות רב-ברירה (multiple choice) חדשות במקצוע "${subjectLabel}", המתאימות לתלמיד בכיתה ${gradeLabel} ברמת קושי ${difficultyLabelHe}.
-
+${curriculumContext}
 כללים:
 - כל השאלות, התשובות וההסברים בעברית תקנית וברורה לילד (חוץ משאלות אנגלית, שם אפשר תוכן באנגלית עם הנחיה בעברית).
 - לכל שאלה בדיוק 4 אפשרויות תשובה, ורק אחת נכונה.
@@ -173,6 +195,51 @@ questionDraftsRouter.post("/generate", async (req, res) => {
       approved: false,
       familyId,
     })),
+  });
+
+  res.status(201).json(created);
+});
+
+questionDraftsRouter.post("/manual", async (req, res) => {
+  const familyId = req.auth!.familyId;
+  const { subject, gradeLevel, difficulty, questionText, options, correctOptionIndex, explanation } =
+    req.body;
+
+  if (!(ALLOWED_SUBJECTS as readonly string[]).includes(subject)) {
+    return res.status(400).json({ error: "Unknown subject" });
+  }
+  if (typeof gradeLevel !== "number" || !Number.isInteger(gradeLevel) || gradeLevel < MIN_GRADE || gradeLevel > MAX_GRADE) {
+    return res.status(400).json({ error: `gradeLevel must be an integer between ${MIN_GRADE} and ${MAX_GRADE}` });
+  }
+  if (typeof difficulty !== "string" || !VALID_DIFFICULTIES.includes(difficulty as Difficulty)) {
+    return res.status(400).json({ error: "difficulty must be EASY, MEDIUM, or HARD" });
+  }
+  if (typeof questionText !== "string" || questionText.trim().length === 0) {
+    return res.status(400).json({ error: "questionText is required" });
+  }
+  if (!Array.isArray(options) || options.length !== 4 || !options.every((o) => typeof o === "string" && o.trim().length > 0)) {
+    return res.status(400).json({ error: "options must be exactly 4 non-empty strings" });
+  }
+  if (typeof correctOptionIndex !== "number" || !Number.isInteger(correctOptionIndex) || correctOptionIndex < 0 || correctOptionIndex > 3) {
+    return res.status(400).json({ error: "correctOptionIndex must be an integer between 0 and 3" });
+  }
+  if (typeof explanation !== "string" || explanation.trim().length === 0) {
+    return res.status(400).json({ error: "explanation is required" });
+  }
+
+  const created = await prisma.question.create({
+    data: {
+      subject,
+      gradeLevel,
+      difficulty: difficulty as Difficulty,
+      questionText: questionText.trim(),
+      options,
+      correctOptionIndex,
+      explanation: explanation.trim(),
+      source: QuestionSource.MANUAL,
+      approved: true,
+      familyId,
+    },
   });
 
   res.status(201).json(created);

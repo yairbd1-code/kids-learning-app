@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/question_draft.dart';
+import '../models/child.dart';
 import '../services/api_service.dart';
 import '../services/practice_service.dart';
 
@@ -17,15 +18,18 @@ class _AiContentScreenState extends State<AiContentScreen> {
   int _gradeLevel = 1;
   String _difficulty = 'MEDIUM';
   int _count = 5;
+  String? _selectedChildId;
   bool _isGenerating = false;
   String _listStatus = 'pending';
 
   late Future<List<QuestionDraft>> _listFuture;
+  late Future<List<Child>> _childrenFuture;
 
   @override
   void initState() {
     super.initState();
     _listFuture = widget.apiService.fetchQuestionDrafts(status: _listStatus);
+    _childrenFuture = widget.apiService.fetchChildren();
   }
 
   void _reload() {
@@ -47,6 +51,7 @@ class _AiContentScreenState extends State<AiContentScreen> {
         gradeLevel: _gradeLevel,
         difficulty: _difficulty,
         count: _count,
+        childId: _selectedChildId,
       );
       if (!mounted) return;
       setState(() => _isGenerating = false);
@@ -85,6 +90,163 @@ class _AiContentScreenState extends State<AiContentScreen> {
     }
   }
 
+  Future<void> _openManualAddDialog() async {
+    final formKey = GlobalKey<FormState>();
+    String subject = practiceSubjects.first;
+    int gradeLevel = 1;
+    String difficulty = 'MEDIUM';
+    final questionController = TextEditingController();
+    final optionControllers = List.generate(4, (_) => TextEditingController());
+    final explanationController = TextEditingController();
+    int correctIndex = 0;
+    bool isSaving = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('הוספת שאלה ידנית'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: subject,
+                          decoration: const InputDecoration(labelText: 'מקצוע'),
+                          items: practiceSubjects
+                              .map((s) => DropdownMenuItem(value: s, child: Text(subjectLabel(s))))
+                              .toList(),
+                          onChanged: (value) => setDialogState(() => subject = value ?? subject),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                initialValue: gradeLevel,
+                                decoration: const InputDecoration(labelText: 'כיתה'),
+                                items: List.generate(gradeLabels.length, (i) => i + 1)
+                                    .map((g) => DropdownMenuItem(value: g, child: Text(gradeLabel(g))))
+                                    .toList(),
+                                onChanged: (value) =>
+                                    setDialogState(() => gradeLevel = value ?? gradeLevel),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                initialValue: difficulty,
+                                decoration: const InputDecoration(labelText: 'רמת קושי'),
+                                items: const ['EASY', 'MEDIUM', 'HARD']
+                                    .map((d) =>
+                                        DropdownMenuItem(value: d, child: Text(difficultyLabel(d))))
+                                    .toList(),
+                                onChanged: (value) =>
+                                    setDialogState(() => difficulty = value ?? difficulty),
+                              ),
+                            ),
+                          ],
+                        ),
+                        TextFormField(
+                          controller: questionController,
+                          decoration: const InputDecoration(labelText: 'טקסט השאלה'),
+                          maxLines: 2,
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty) ? 'חובה' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        Text('תשובות (סמנו את הנכונה)', style: Theme.of(context).textTheme.labelLarge),
+                        RadioGroup<int>(
+                          groupValue: correctIndex,
+                          onChanged: (value) =>
+                              setDialogState(() => correctIndex = value ?? correctIndex),
+                          child: Column(
+                            children: List.generate(4, (i) {
+                              return Row(
+                                children: [
+                                  Radio<int>(value: i),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: optionControllers[i],
+                                      decoration: InputDecoration(labelText: 'תשובה ${i + 1}'),
+                                      validator: (value) =>
+                                          (value == null || value.trim().isEmpty) ? 'חובה' : null,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: explanationController,
+                          decoration: const InputDecoration(labelText: 'הסבר (יוצג לילד אם יטעה)'),
+                          maxLines: 2,
+                          validator: (value) =>
+                              (value == null || value.trim().isEmpty) ? 'חובה' : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('ביטול'),
+                ),
+                FilledButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSaving = true);
+                          try {
+                            await widget.apiService.addManualQuestion(
+                              subject: subject,
+                              gradeLevel: gradeLevel,
+                              difficulty: difficulty,
+                              questionText: questionController.text.trim(),
+                              options: optionControllers.map((c) => c.text.trim()).toList(),
+                              correctOptionIndex: correctIndex,
+                              explanation: explanationController.text.trim(),
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop();
+                            }
+                            setState(() => _listStatus = 'approved');
+                            _reload();
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(content: Text('שגיאה: $e')),
+                              );
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('הוספה'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _remove(QuestionDraft draft) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -110,7 +272,16 @@ class _AiContentScreenState extends State<AiContentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('יצירת שאלות עם AI')),
+      appBar: AppBar(
+        title: const Text('יצירת שאלות עם AI'),
+        actions: [
+          IconButton(
+            onPressed: _openManualAddDialog,
+            icon: const Icon(Icons.edit_note),
+            tooltip: 'הוספת שאלה ידנית',
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -172,6 +343,28 @@ class _AiContentScreenState extends State<AiContentScreen> {
                     onChanged: _isGenerating
                         ? null
                         : (value) => setState(() => _count = value ?? _count),
+                  ),
+                  const SizedBox(height: 12),
+                  FutureBuilder<List<Child>>(
+                    future: _childrenFuture,
+                    builder: (context, snapshot) {
+                      final children = snapshot.data ?? [];
+                      return DropdownButtonFormField<String?>(
+                        initialValue: _selectedChildId,
+                        decoration: const InputDecoration(
+                          labelText: 'התאמה לחומר הלימוד של (לא חובה)',
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(value: null, child: Text('ללא')),
+                          ...children.map(
+                            (c) => DropdownMenuItem<String?>(value: c.id, child: Text(c.name)),
+                          ),
+                        ],
+                        onChanged: _isGenerating
+                            ? null
+                            : (value) => setState(() => _selectedChildId = value),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   FilledButton.icon(

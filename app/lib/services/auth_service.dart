@@ -25,8 +25,14 @@ class ProfileInfo {
   final String parentName;
   final String email;
   final String familyName;
+  final String joinCode;
 
-  ProfileInfo({required this.parentName, required this.email, required this.familyName});
+  ProfileInfo({
+    required this.parentName,
+    required this.email,
+    required this.familyName,
+    required this.joinCode,
+  });
 
   factory ProfileInfo.fromJson(Map<String, dynamic> json) {
     final parent = json['parent'] as Map<String, dynamic>;
@@ -35,6 +41,30 @@ class ProfileInfo {
       parentName: parent['name'] as String,
       email: parent['email'] as String,
       familyName: family['name'] as String,
+      joinCode: family['joinCode'] as String,
+    );
+  }
+}
+
+class FamilyMember {
+  final String id;
+  final String name;
+  final String email;
+  final String authProvider;
+
+  FamilyMember({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.authProvider,
+  });
+
+  factory FamilyMember.fromJson(Map<String, dynamic> json) {
+    return FamilyMember(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      email: json['email'] as String,
+      authProvider: json['authProvider'] as String,
     );
   }
 }
@@ -94,6 +124,43 @@ class AuthService {
       throw AuthException((data['error'] as String?) ?? 'שגיאה בהרשמה');
     }
     await _saveToken(data['token'] as String);
+  }
+
+  Future<void> joinFamily({
+    required String joinCode,
+    required String parentName,
+    required String email,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/auth/join'),
+      headers: {'Content-Type': 'application/json; charset=utf-8'},
+      body: jsonEncode({
+        'joinCode': joinCode,
+        'parentName': parentName,
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 201) {
+      throw AuthException((data['error'] as String?) ?? 'שגיאה בהצטרפות למשפחה');
+    }
+    await _saveToken(data['token'] as String);
+  }
+
+  Future<List<FamilyMember>> fetchFamilyMembers() async {
+    final response = await http.get(
+      Uri.parse('$apiBaseUrl/auth/family-members'),
+      headers: {'Authorization': 'Bearer $_token'},
+    );
+
+    if (response.statusCode != 200) {
+      throw AuthException('שגיאה בטעינת רשימת ההורים');
+    }
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.map((json) => FamilyMember.fromJson(json as Map<String, dynamic>)).toList();
   }
 
   Future<void> login({required String email, required String password}) async {

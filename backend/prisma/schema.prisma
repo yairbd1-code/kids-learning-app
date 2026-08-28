@@ -10,6 +10,7 @@ datasource db {
 model Family {
   id          String       @id @default(uuid())
   name        String
+  joinCode    String       @unique @map("join_code")
   createdAt   DateTime     @default(now()) @map("created_at")
   parentUsers ParentUser[]
   children    Child[]
@@ -47,14 +48,34 @@ model Child {
   age         Int
   grade       String?
   pinHash     String?       @map("pin_hash")
+  disabledSubjects String[] @default([]) @map("disabled_subjects")
+  // מיפוי מקצוע->משקל יחסי לתרגול מעורב (למשל {"math":50,"english":30,"hebrew":20}).
+  // null/חסר = פיצול שווה בין המקצועות הפעילים.
+  subjectWeights Json? @map("subject_weights")
   createdAt   DateTime      @default(now()) @map("created_at")
   wallet      PointsWallet?
   redemptions Redemption[]
   taskCompletions TaskCompletion[]
   subjectProgress ChildSubjectProgress[]
   practiceAttempts PracticeAttempt[]
+  curriculumNotes ChildCurriculumNote[]
 
   @@map("children")
+}
+
+// "מה הילד לומד השנה" — טקסט חופשי שההורה כותב או שמופק מצילום דף/ספר לימוד
+// (ה-OCR עצמו לא נשמר, רק התוכן הטקסטואלי שחולץ ממנו). משמש כהקשר נוסף
+// כשיוצרים שאלות עם AI במקצוע הזה, כדי שהשאלות יתאימו לחומר הספציפי של הילד.
+model ChildCurriculumNote {
+  id        String   @id @default(uuid())
+  childId   String   @map("child_id")
+  child     Child    @relation(fields: [childId], references: [id])
+  subject   String
+  noteText  String   @map("note_text")
+  source    String   @default("manual") // manual | photo
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("child_curriculum_notes")
 }
 
 model PointsWallet {
@@ -92,6 +113,7 @@ enum Difficulty {
 enum QuestionSource {
   SEED
   AI
+  MANUAL
 }
 
 model Question {

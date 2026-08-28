@@ -4,6 +4,7 @@ import '../models/practice_question.dart';
 import 'auth_service.dart' show apiBaseUrl;
 
 const List<String> practiceSubjects = ['math', 'english', 'hebrew'];
+const String mixedSubjectValue = 'mixed';
 
 String subjectLabel(String subject) {
   switch (subject) {
@@ -13,6 +14,8 @@ String subjectLabel(String subject) {
       return 'אנגלית';
     case 'hebrew':
       return 'עברית';
+    case mixedSubjectValue:
+      return 'תרגול מעורב';
     default:
       return subject;
   }
@@ -53,9 +56,21 @@ class PracticeService {
         'Authorization': 'Bearer $childToken',
       };
 
+  Future<List<String>> fetchEnabledSubjects() async {
+    final response = await http.get(Uri.parse('$apiBaseUrl/practice/subjects'), headers: _headers);
+
+    if (response.statusCode != 200) {
+      throw Exception('שגיאה בטעינת רשימת המקצועות (${response.statusCode})');
+    }
+
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.map((e) => e as String).toList();
+  }
+
   Future<PracticeQuestion> fetchNextQuestion(String subject) async {
+    final path = subject == mixedSubjectValue ? 'mixed' : subject;
     final response = await http.get(
-      Uri.parse('$apiBaseUrl/practice/$subject/next-question'),
+      Uri.parse('$apiBaseUrl/practice/$path/next-question'),
       headers: _headers,
     );
 
