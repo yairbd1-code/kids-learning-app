@@ -15,6 +15,7 @@ model Family {
   children    Child[]
   rewards     Reward[]
   learningTasks LearningTask[]
+  generatedQuestions Question[]
 
   @@map("families")
 }
@@ -88,6 +89,11 @@ enum Difficulty {
   HARD
 }
 
+enum QuestionSource {
+  SEED
+  AI
+}
+
 model Question {
   id                 String            @id @default(uuid())
   subject            String
@@ -97,6 +103,12 @@ model Question {
   options            String[]
   correctOptionIndex Int               @map("correct_option_index")
   explanation        String
+  source             QuestionSource    @default(SEED)
+  approved           Boolean           @default(true)
+  // null = כלול במאגר הגלובלי (זמין לכל המשפחות). לא-null = שאלה שנוצרה
+  // ע"י AI עבור משפחה ספציפית (חיזוק נושא), זמינה רק לילדים של אותה משפחה.
+  familyId           String?           @map("family_id")
+  family             Family?           @relation(fields: [familyId], references: [id])
   createdAt          DateTime          @default(now()) @map("created_at")
   attempts           PracticeAttempt[]
 

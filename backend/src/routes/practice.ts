@@ -64,6 +64,8 @@ practiceRouter.get("/:subject/next-question", async (req, res) => {
       subject,
       gradeLevel: progress.currentGrade,
       difficulty: progress.currentDifficulty,
+      approved: true,
+      OR: [{ familyId: null }, { familyId }],
     },
   });
 

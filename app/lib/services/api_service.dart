@@ -7,6 +7,7 @@ import '../models/redemption.dart';
 import '../models/learning_task.dart';
 import '../models/task_completion.dart';
 import '../models/subject_progress.dart';
+import '../models/question_draft.dart';
 import 'auth_service.dart';
 
 class ChildSession {
@@ -402,5 +403,75 @@ class ApiService {
     }
 
     return SubjectProgress.fromJson(data);
+  }
+
+  Future<List<QuestionDraft>> fetchQuestionDrafts({String? status}) async {
+    final uri = Uri.parse('$apiBaseUrl/question-drafts').replace(
+      queryParameters: status != null ? {'status': status} : null,
+    );
+    final response = await http.get(uri, headers: _authHeaders);
+
+    if (response.statusCode != 200) {
+      throw Exception('שגיאה בטעינת השאלות (${response.statusCode})');
+    }
+
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.map((json) => QuestionDraft.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<QuestionDraft>> generateQuestionDrafts({
+    required String subject,
+    required int gradeLevel,
+    required String difficulty,
+    required int count,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$apiBaseUrl/question-drafts/generate'),
+      headers: _authHeaders,
+      body: jsonEncode({
+        'subject': subject,
+        'gradeLevel': gradeLevel,
+        'difficulty': difficulty,
+        'count': count,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      throw Exception((data['error'] as String?) ?? 'שגיאה ביצירת השאלות');
+    }
+
+    final List<dynamic> data = jsonDecode(utf8.decode(response.bodyBytes));
+    return data.map((json) => QuestionDraft.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  Future<QuestionDraft> setQuestionDraftApproved({
+    required String draftId,
+    required bool approved,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('$apiBaseUrl/question-drafts/$draftId'),
+      headers: _authHeaders,
+      body: jsonEncode({'approved': approved}),
+    );
+
+    final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception((data['error'] as String?) ?? 'שגיאה בעדכון השאלה');
+    }
+
+    return QuestionDraft.fromJson(data);
+  }
+
+  Future<void> deleteQuestionDraft(String draftId) async {
+    final response = await http.delete(
+      Uri.parse('$apiBaseUrl/question-drafts/$draftId'),
+      headers: _authHeaders,
+    );
+
+    if (response.statusCode != 204) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      throw Exception((data['error'] as String?) ?? 'שגיאה במחיקת השאלה');
+    }
   }
 }

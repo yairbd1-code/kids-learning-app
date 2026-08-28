@@ -6,6 +6,7 @@ import 'child_detail_screen.dart';
 import 'rewards_screen.dart';
 import 'learning_tasks_screen.dart';
 import 'settings_screen.dart';
+import 'ai_content_screen.dart';
 
 class ChildrenScreen extends StatefulWidget {
   final ApiService apiService;
@@ -163,6 +164,15 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
             },
             icon: const Icon(Icons.card_giftcard),
             tooltip: 'חנות פרסים',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => AiContentScreen(apiService: _api)),
+              );
+            },
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'יצירת שאלות עם AI',
           ),
           IconButton(
             onPressed: () {
