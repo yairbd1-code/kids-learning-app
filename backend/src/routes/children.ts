@@ -6,11 +6,33 @@ import { ALLOWED_SUBJECTS } from "./practice";
 
 export const childrenRouter = Router();
 
+// שש ערכות צבע קבועות שהילד/ה בוחר/ת לעצמו/ה במסך "הצבעים שלי" — ראו
+// לוח העיצוב שסוכם. השמות תואמים בכוונה לצבעים ב-Flutter (lib/theme/child_theme.dart).
+const ALLOWED_THEMES = ["ocean", "blossom", "forest", "galaxy", "sunshine", "fire"] as const;
+type ChildTheme = (typeof ALLOWED_THEMES)[number];
+
+function isValidTheme(value: unknown): value is ChildTheme {
+  return typeof value === "string" && (ALLOWED_THEMES as readonly string[]).includes(value);
+}
+
+// data URI בלבד (base64 מוטמע, כמו בתמונות ה-OCR של חומרי הלימוד) - אין
+// עדיין אחסון קבצים חיצוני (S3/Cloud Storage), אז זה הפתרון הפשוט ל-MVP.
+const VALID_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+function isValidPhotoUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const match = value.match(/^data:(image\/[a-z]+);base64,/);
+  if (!match || !VALID_PHOTO_TYPES.includes(match[1])) return false;
+  // ~3MB בבסיס 64 (מספיק בנדיבות לתמונת פרופיל דחוסה ל-480x480)
+  return value.length <= 4_000_000;
+}
+
 function serializeChild(child: {
   id: string;
   name: string;
   age: number;
   grade: string | null;
+  photoUrl: string | null;
+  themeId: string;
   pinHash: string | null;
   disabledSubjects: string[];
   subjectWeights: unknown;
@@ -21,6 +43,8 @@ function serializeChild(child: {
     name: child.name,
     age: child.age,
     grade: child.grade,
+    photoUrl: child.photoUrl,
+    themeId: child.themeId,
     pointsBalance: child.wallet?.balance ?? 0,
     hasPin: child.pinHash !== null,
     disabledSubjects: child.disabledSubjects,
@@ -61,7 +85,7 @@ childrenRouter.get("/", async (req, res) => {
 
 childrenRouter.post("/", async (req, res) => {
   const familyId = req.auth!.familyId;
-  const { name, age, grade } = req.body;
+  const { name, age, grade, photoUrl, themeId } = req.body;
 
   if (typeof name !== "string" || name.trim().length === 0) {
     return res.status(400).json({ error: "name is required" });
@@ -72,6 +96,12 @@ childrenRouter.post("/", async (req, res) => {
   if (grade !== undefined && grade !== null && typeof grade !== "string") {
     return res.status(400).json({ error: "grade must be a string" });
   }
+  if (photoUrl !== undefined && photoUrl !== null && !isValidPhotoUrl(photoUrl)) {
+    return res.status(400).json({ error: "photoUrl must be a jpeg/png/webp data URI up to ~3MB" });
+  }
+  if (themeId !== undefined && !isValidTheme(themeId)) {
+    return res.status(400).json({ error: `themeId must be one of: ${ALLOWED_THEMES.join(", ")}` });
+  }
 
   const child = await prisma.child.create({
     data: {
@@ -79,6 +109,8 @@ childrenRouter.post("/", async (req, res) => {
       name: name.trim(),
       age,
       grade: grade ?? null,
+      photoUrl: photoUrl ?? null,
+      ...(themeId !== undefined ? { themeId } : {}),
       wallet: { create: {} },
     },
     include: { wallet: true },
@@ -90,7 +122,7 @@ childrenRouter.post("/", async (req, res) => {
 childrenRouter.patch("/:childId", async (req, res) => {
   const familyId = req.auth!.familyId;
   const { childId } = req.params;
-  const { name, age, grade, disabledSubjects, subjectWeights } = req.body;
+  const { name, age, grade, photoUrl, themeId, disabledSubjects, subjectWeights } = req.body;
 
   const existing = await prisma.child.findFirst({ where: { id: childId, familyId } });
   if (!existing) {
@@ -109,6 +141,12 @@ childrenRouter.patch("/:childId", async (req, res) => {
   if (grade !== undefined && grade !== null && typeof grade !== "string") {
     return res.status(400).json({ error: "grade must be a string" });
   }
+  if (photoUrl !== undefined && photoUrl !== null && !isValidPhotoUrl(photoUrl)) {
+    return res.status(400).json({ error: "photoUrl must be a jpeg/png/webp data URI up to ~3MB" });
+  }
+  if (themeId !== undefined && !isValidTheme(themeId)) {
+    return res.status(400).json({ error: `themeId must be one of: ${ALLOWED_THEMES.join(", ")}` });
+  }
   if (disabledSubjects !== undefined && !isValidSubjectList(disabledSubjects)) {
     return res.status(400).json({ error: "disabledSubjects must be an array of known subjects" });
   }
@@ -124,6 +162,8 @@ childrenRouter.patch("/:childId", async (req, res) => {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(age !== undefined ? { age } : {}),
       ...(grade !== undefined ? { grade } : {}),
+      ...(photoUrl !== undefined ? { photoUrl } : {}),
+      ...(themeId !== undefined ? { themeId } : {}),
       ...(disabledSubjects !== undefined ? { disabledSubjects } : {}),
       ...(subjectWeights !== undefined ? { subjectWeights } : {}),
     },

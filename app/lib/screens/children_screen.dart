@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/child.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/child_avatar.dart';
+import '../widgets/child_appearance_picker.dart';
 import 'child_detail_screen.dart';
 import 'rewards_screen.dart';
 import 'learning_tasks_screen.dart';
@@ -50,6 +52,7 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
     final nameController = TextEditingController();
     final ageController = TextEditingController();
     final gradeController = TextEditingController();
+    final appearance = ChildAppearanceController();
     bool isSaving = false;
 
     await showDialog<void>(
@@ -59,38 +62,45 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
               title: const Text('הוספת ילד'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'שם'),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'חובה להזין שם';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: ageController,
-                      decoration: const InputDecoration(labelText: 'גיל'),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        final age = int.tryParse(value ?? '');
-                        if (age == null || age < 0 || age > 18) {
-                          return 'גיל צריך להיות מספר בין 0 ל-18';
-                        }
-                        return null;
-                      },
-                    ),
-                    TextFormField(
-                      controller: gradeController,
-                      decoration: const InputDecoration(labelText: 'כיתה (לא חובה)'),
-                    ),
-                  ],
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ChildAppearancePicker(
+                        controller: appearance,
+                        nameForInitials: () => nameController.text,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'שם'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'חובה להזין שם';
+                          }
+                          return null;
+                        },
+                      ),
+                      TextFormField(
+                        controller: ageController,
+                        decoration: const InputDecoration(labelText: 'גיל'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          final age = int.tryParse(value ?? '');
+                          if (age == null || age < 0 || age > 18) {
+                            return 'גיל צריך להיות מספר בין 0 ל-18';
+                          }
+                          return null;
+                        },
+                      ),
+                      TextFormField(
+                        controller: gradeController,
+                        decoration: const InputDecoration(labelText: 'כיתה (לא חובה)'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -111,6 +121,8 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
                               grade: gradeController.text.trim().isEmpty
                                   ? null
                                   : gradeController.text.trim(),
+                              photoUrl: appearance.photoDataUri,
+                              themeId: appearance.themeId,
                             );
                             if (dialogContext.mounted) {
                               Navigator.of(dialogContext).pop();
@@ -222,6 +234,12 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
+                  leading: ChildAvatar(
+                    photoDataUri: child.photoUrl,
+                    themeId: child.themeId,
+                    name: child.name,
+                    radius: 22,
+                  ),
                   title: Text(child.name),
                   subtitle: Text(
                     (child.grade == null || child.grade!.isEmpty)

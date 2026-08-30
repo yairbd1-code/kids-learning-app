@@ -48,11 +48,19 @@ class ApiService {
     required String name,
     required int age,
     String? grade,
+    String? photoUrl,
+    String? themeId,
   }) async {
     final response = await http.post(
       Uri.parse('$apiBaseUrl/children'),
       headers: _authHeaders,
-      body: jsonEncode({'name': name, 'age': age, 'grade': grade}),
+      body: jsonEncode({
+        'name': name,
+        'age': age,
+        'grade': grade,
+        'photoUrl': ?photoUrl,
+        'themeId': ?themeId,
+      }),
     );
 
     if (response.statusCode != 201) {
@@ -67,6 +75,8 @@ class ApiService {
     String? name,
     int? age,
     String? grade,
+    String? photoUrl,
+    String? themeId,
     List<String>? disabledSubjects,
     Map<String, int>? subjectWeights,
   }) async {
@@ -74,6 +84,8 @@ class ApiService {
     if (name != null) body['name'] = name;
     if (age != null) body['age'] = age;
     if (grade != null) body['grade'] = grade;
+    if (photoUrl != null) body['photoUrl'] = photoUrl;
+    if (themeId != null) body['themeId'] = themeId;
     if (disabledSubjects != null) body['disabledSubjects'] = disabledSubjects;
     if (subjectWeights != null) body['subjectWeights'] = subjectWeights;
 

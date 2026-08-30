@@ -47,6 +47,8 @@ model Child {
   name        String
   age         Int
   grade       String?
+  photoUrl    String?       @map("photo_url")
+  themeId     String        @default("ocean") @map("theme_id")
   pinHash     String?       @map("pin_hash")
   disabledSubjects String[] @default([]) @map("disabled_subjects")
   // מיפוי מקצוע->משקל יחסי לתרגול מעורב (למשל {"math":50,"english":30,"hebrew":20}).

@@ -19,7 +19,10 @@ import { requireAuth, requireChildAuth } from "./auth/middleware";
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// ברירת המחדל (100kb) קטנה מדי לתמונות base64 (חומרי לימוד, תמונת פרופיל
+// לילד) - מגדילים גלובלית כדי שגם ה-parser הייעודי ב-curriculumNotes.ts
+// (שרץ אחרי זה ולא היה נתפס בכלל תחת המגבלה המקורית) יקבל בפועל בקשות גדולות.
+app.use(express.json({ limit: "10mb" }));
 
 app.use("/auth", authRouter);
 app.use("/children", requireAuth, childrenRouter);

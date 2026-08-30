@@ -3,6 +3,8 @@ class Child {
   final String name;
   final int age;
   final String? grade;
+  final String? photoUrl;
+  final String themeId;
   final int pointsBalance;
   final bool hasPin;
   final List<String> disabledSubjects;
@@ -13,6 +15,8 @@ class Child {
     required this.name,
     required this.age,
     required this.grade,
+    this.photoUrl,
+    this.themeId = 'ocean',
     required this.pointsBalance,
     required this.hasPin,
     required this.disabledSubjects,
@@ -26,6 +30,8 @@ class Child {
       name: json['name'] as String,
       age: json['age'] as int,
       grade: json['grade'] as String?,
+      photoUrl: json['photoUrl'] as String?,
+      themeId: json['themeId'] as String? ?? 'ocean',
       pointsBalance: json['pointsBalance'] as int,
       hasPin: json['hasPin'] as bool? ?? false,
       disabledSubjects: (json['disabledSubjects'] as List<dynamic>? ?? [])
