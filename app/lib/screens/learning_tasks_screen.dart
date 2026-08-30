@@ -239,8 +239,10 @@ class _LearningTasksScreenState extends State<LearningTasksScreen> {
             return const Center(child: Text('עדיין לא נוספו משימות. לחצו על + כדי להתחיל.'));
           }
 
+          final colorScheme = Theme.of(context).colorScheme;
+
           return ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             itemCount: tasks.length,
             itemBuilder: (context, index) {
               final task = tasks[index];
@@ -248,7 +250,17 @@ class _LearningTasksScreenState extends State<LearningTasksScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  title: Text(task.name),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(Icons.checklist, color: colorScheme.onPrimary, size: 22),
+                  ),
+                  title: Text(task.name, style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text('$subjectLabel${task.rewardPoints} נקודות${_ageRangeLabel(task)}'),
                   onTap: () => _openTaskDialog(existing: task),
                   trailing: IconButton(

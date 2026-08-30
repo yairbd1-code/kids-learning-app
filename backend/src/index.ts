@@ -14,6 +14,7 @@ import { questionDraftsRouter } from "./routes/questionDrafts";
 import { practiceStatsRouter } from "./routes/practiceStats";
 import { curriculumNotesRouter } from "./routes/curriculumNotes";
 import { childStoreRouter } from "./routes/childStore";
+import { childProfileRouter } from "./routes/childProfile";
 import { requireAuth, requireChildAuth } from "./auth/middleware";
 
 const app = express();
@@ -37,6 +38,7 @@ app.use("/children/:childId/curriculum-notes", requireAuth, curriculumNotesRoute
 app.use("/question-drafts", requireAuth, questionDraftsRouter);
 app.use("/practice", requireChildAuth, practiceRouter);
 app.use("/store", requireChildAuth, childStoreRouter);
+app.use("/me", requireChildAuth, childProfileRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });

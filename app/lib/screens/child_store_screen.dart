@@ -6,8 +6,9 @@ import '../services/child_store_service.dart';
 
 class ChildStoreScreen extends StatefulWidget {
   final ChildSession session;
+  final Color? themeColor;
 
-  const ChildStoreScreen({super.key, required this.session});
+  const ChildStoreScreen({super.key, required this.session, this.themeColor});
 
   @override
   State<ChildStoreScreen> createState() => _ChildStoreScreenState();
@@ -101,6 +102,8 @@ class _ChildStoreScreenState extends State<ChildStoreScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('חנות פרסים'),
+        backgroundColor: widget.themeColor,
+        foregroundColor: widget.themeColor != null ? Colors.white : null,
         actions: [
           IconButton(
             icon: Icon(_showRequests ? Icons.storefront : Icons.receipt_long_outlined),

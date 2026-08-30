@@ -20,8 +20,9 @@ IconData _subjectIcon(String subject) {
 
 class PracticeSubjectScreen extends StatefulWidget {
   final ChildSession session;
+  final Color? themeColor;
 
-  const PracticeSubjectScreen({super.key, required this.session});
+  const PracticeSubjectScreen({super.key, required this.session, this.themeColor});
 
   @override
   State<PracticeSubjectScreen> createState() => _PracticeSubjectScreenState();
@@ -41,7 +42,11 @@ class _PracticeSubjectScreenState extends State<PracticeSubjectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('באיזה מקצוע נתרגל?')),
+      appBar: AppBar(
+        title: const Text('באיזה מקצוע נתרגל?'),
+        backgroundColor: widget.themeColor,
+        foregroundColor: widget.themeColor != null ? Colors.white : null,
+      ),
       body: FutureBuilder<List<String>>(
         future: _subjectsFuture,
         builder: (context, snapshot) {

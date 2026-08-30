@@ -8,10 +8,10 @@ export const childrenRouter = Router();
 
 // שש ערכות צבע קבועות שהילד/ה בוחר/ת לעצמו/ה במסך "הצבעים שלי" — ראו
 // לוח העיצוב שסוכם. השמות תואמים בכוונה לצבעים ב-Flutter (lib/theme/child_theme.dart).
-const ALLOWED_THEMES = ["ocean", "blossom", "forest", "galaxy", "sunshine", "fire"] as const;
-type ChildTheme = (typeof ALLOWED_THEMES)[number];
+export const ALLOWED_THEMES = ["ocean", "blossom", "forest", "galaxy", "sunshine", "fire"] as const;
+export type ChildTheme = (typeof ALLOWED_THEMES)[number];
 
-function isValidTheme(value: unknown): value is ChildTheme {
+export function isValidTheme(value: unknown): value is ChildTheme {
   return typeof value === "string" && (ALLOWED_THEMES as readonly string[]).includes(value);
 }
 
