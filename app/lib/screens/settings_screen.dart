@@ -205,35 +205,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
           }
 
           final profile = snapshot.data!;
-          return ListView(
-            children: [
-              ListTile(
-                title: const Text('השם שלך'),
-                subtitle: Text(profile.parentName),
-              ),
-              ListTile(
-                title: const Text('אימייל'),
-                subtitle: Text(profile.email),
-              ),
-              ListTile(
-                title: const Text('שם המשפחה'),
-                subtitle: Text(profile.familyName),
-              ),
-              const Divider(),
-              ListTile(
-                title: const Text('קוד משפחה'),
-                subtitle: Text(
-                  '${profile.joinCode}\nשתפו את הקוד עם בן/בת הזוג כדי שיוכלו להצטרף לאותה משפחה',
+          final colorScheme = Theme.of(context).colorScheme;
+
+          Widget sectionLabel(String text) => Padding(
+                padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+                child: Text(
+                  text,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.copy),
-                  tooltip: 'העתקת הקוד',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: profile.joinCode));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('הקוד הועתק')),
-                    );
-                  },
+              );
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              sectionLabel('פרטי חשבון'),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.person_outline),
+                      title: const Text('השם שלך'),
+                      subtitle: Text(profile.parentName),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    ListTile(
+                      leading: const Icon(Icons.email_outlined),
+                      title: const Text('אימייל'),
+                      subtitle: Text(profile.email),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    ListTile(
+                      leading: const Icon(Icons.groups_outlined),
+                      title: const Text('שם המשפחה'),
+                      subtitle: Text(profile.familyName),
+                    ),
+                  ],
+                ),
+              ),
+              sectionLabel('הצטרפות בני משפחה'),
+              Card(
+                color: colorScheme.primaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'קוד המשפחה שלכם',
+                              style: TextStyle(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              profile.joinCode,
+                              style: TextStyle(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 26,
+                                letterSpacing: 3,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'שתפו את הקוד עם בן/בת הזוג כדי שיוכלו להצטרף לאותה משפחה',
+                              style: TextStyle(color: colorScheme.onPrimaryContainer, fontSize: 12.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton.filled(
+                        icon: const Icon(Icons.copy),
+                        tooltip: 'העתקת הקוד',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: profile.joinCode));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('הקוד הועתק')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               FutureBuilder<List<FamilyMember>>(
@@ -241,31 +301,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 builder: (context, snapshot) {
                   final members = snapshot.data ?? [];
                   if (members.length <= 1) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('בני המשפחה עם גישה', style: Theme.of(context).textTheme.labelLarge),
-                        ...members.map(
-                          (m) => Text('${m.name} · ${m.email}',
-                              style: Theme.of(context).textTheme.bodySmall),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      sectionLabel('בני המשפחה עם גישה'),
+                      Card(
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < members.length; i++) ...[
+                              if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+                              ListTile(
+                                leading: const Icon(Icons.person_outline),
+                                title: Text(members[i].name),
+                                subtitle: Text(members[i].email),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   );
                 },
               ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('עריכת שם / שם משפחה'),
-                onTap: () => _openEditNamesDialog(profile),
-              ),
-              ListTile(
-                leading: const Icon(Icons.lock_outline),
-                title: const Text('שינוי סיסמה'),
-                onTap: _openChangePasswordDialog,
+              sectionLabel('פעולות'),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.edit_outlined),
+                      title: const Text('עריכת שם / שם משפחה'),
+                      onTap: () => _openEditNamesDialog(profile),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    ListTile(
+                      leading: const Icon(Icons.lock_outline),
+                      title: const Text('שינוי סיסמה'),
+                      onTap: _openChangePasswordDialog,
+                    ),
+                  ],
+                ),
               ),
             ],
           );

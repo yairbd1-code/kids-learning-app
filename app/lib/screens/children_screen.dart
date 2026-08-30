@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/child.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../theme/child_theme.dart';
 import '../widgets/child_avatar.dart';
 import '../widgets/child_appearance_picker.dart';
 import 'child_detail_screen.dart';
@@ -223,30 +224,88 @@ class _ChildrenScreenState extends State<ChildrenScreen> {
 
           final children = snapshot.data ?? [];
           if (children.isEmpty) {
-            return const Center(child: Text('עדיין לא נוספו ילדים. לחצו על + כדי להתחיל.'));
+            final colorScheme = Theme.of(context).colorScheme;
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.face_outlined, size: 44, color: colorScheme.onPrimaryContainer),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'עדיין אין ילדים במשפחה',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'הוסיפו ילד או ילדה כדי להתחיל לנהל נקודות ופרסים',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _openAddChildDialog,
+                      icon: const Icon(Icons.add),
+                      label: const Text('הוספת ילד/ה'),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             itemCount: children.length,
             itemBuilder: (context, index) {
               final child = children[index];
+              final childTheme = ChildTheme.byId(child.themeId);
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   leading: ChildAvatar(
                     photoDataUri: child.photoUrl,
                     themeId: child.themeId,
                     name: child.name,
-                    radius: 22,
+                    radius: 24,
                   ),
-                  title: Text(child.name),
+                  title: Text(child.name, style: const TextStyle(fontWeight: FontWeight.w700)),
                   subtitle: Text(
                     (child.grade == null || child.grade!.isEmpty)
                         ? 'גיל ${child.age}'
                         : 'גיל ${child.age} · כיתה ${child.grade}',
                   ),
-                  trailing: Chip(label: Text('${child.pointsBalance} נקודות')),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: childTheme.primary.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star_rounded, size: 15, color: childTheme.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${child.pointsBalance}',
+                          style: TextStyle(color: childTheme.primary, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                  ),
                   onTap: () async {
                     await Navigator.of(context).push(
                       MaterialPageRoute(
