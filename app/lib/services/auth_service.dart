@@ -3,9 +3,16 @@ import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, Tar
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+// כתובת שרת ה-production, מוזרקת רק בזמן build עם:
+// flutter build web --dart-define=API_BASE_URL=https://kids-learning-backend-l2ts.onrender.com
+// כשזה ריק (ברירת המחדל, כמו ב-flutter run הרגיל בפיתוח) חוזרים לכתובת
+// המקומית - כך שאין צורך לגעת בקוד בין עבודה מקומית לבנייה אמיתית.
+const String _prodApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+
 // באמולטור אנדרואיד "localhost" מצביע על המכשיר הווירטואלי עצמו, לא על
 // המחשב המארח - 10.0.2.2 הוא הכתובת המיוחדת שהאמולטור מספק לגישה למארח.
 String get apiBaseUrl {
+  if (_prodApiBaseUrl.isNotEmpty) return _prodApiBaseUrl;
   if (kIsWeb) return 'http://localhost:3000';
   if (defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:3000';
   return 'http://localhost:3000';
