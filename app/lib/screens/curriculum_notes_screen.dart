@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import '../models/child.dart';
 import '../models/curriculum_note.dart';
 import '../services/api_service.dart';
@@ -126,11 +127,30 @@ class _CurriculumNotesScreenState extends State<CurriculumNotesScreen> {
     final XFile? picked = await picker.pickImage(source: source, imageQuality: 80);
     if (picked == null || !mounted) return;
 
+    final bytes = await picked.readAsBytes();
+    await _upload(subject: subject, bytes: bytes, mediaType: _mediaTypeFor(picked.name));
+  }
+
+  Future<void> _addFromFile() async {
+    final subject = await _pickSubject();
+    if (subject == null || !mounted) return;
+
+    const pdfType = XTypeGroup(label: 'PDF', extensions: ['pdf']);
+    final XFile? picked = await openFile(acceptedTypeGroups: [pdfType]);
+    if (picked == null || !mounted) return;
+
+    final bytes = await picked.readAsBytes();
+    await _upload(subject: subject, bytes: bytes, mediaType: 'application/pdf');
+  }
+
+  Future<void> _upload({
+    required String subject,
+    required List<int> bytes,
+    required String mediaType,
+  }) async {
     setState(() => _isBusy = true);
     try {
-      final bytes = await picked.readAsBytes();
       final base64Data = base64Encode(bytes);
-      final mediaType = _mediaTypeFor(picked.name);
       await widget.apiService.addCurriculumNoteFromImage(
         childId: widget.child.id,
         subject: subject,
@@ -141,7 +161,7 @@ class _CurriculumNotesScreenState extends State<CurriculumNotesScreen> {
       setState(() => _isBusy = false);
       _reload();
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('התמונה נקראה ונוספה כחומר לימוד')));
+          .showSnackBar(const SnackBar(content: Text('הקובץ נקרא ונוסף כחומר לימוד')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _isBusy = false);
@@ -149,10 +169,22 @@ class _CurriculumNotesScreenState extends State<CurriculumNotesScreen> {
     }
   }
 
+  IconData _sourceIcon(String source) {
+    switch (source) {
+      case 'photo':
+        return Icons.photo_camera_outlined;
+      case 'file':
+        return Icons.picture_as_pdf_outlined;
+      default:
+        return Icons.edit_note;
+    }
+  }
+
   String _mediaTypeFor(String filename) {
     final lower = filename.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.pdf')) return 'application/pdf';
     return 'image/jpeg';
   }
 
@@ -179,36 +211,36 @@ class _CurriculumNotesScreenState extends State<CurriculumNotesScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'תארו כאן מה הילד/ה לומד/ת השנה בכל מקצוע — בכתיבה או בצילום דף מהספר. '
-                  'התמונה עצמה נמחקת מיד אחרי הקריאה, נשמר רק התיאור. '
-                  'המידע הזה ישמש ליצירת שאלות תרגול מותאמות יותר במסך "יצירת שאלות עם AI".',
+                  'תארו כאן מה הילד/ה לומד/ת השנה בכל מקצוע — בכתיבה, בצילום דף מהספר, '
+                  'או בהעלאת קובץ PDF. התמונה/הקובץ עצמם נמחקים מיד אחרי הקריאה, נשמר '
+                  'רק התיאור. המידע הזה ישמש ליצירת שאלות תרגול מותאמות יותר במסך '
+                  '"יצירת שאלות עם AI".',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _isBusy ? null : _openAddTextDialog,
-                        icon: const Icon(Icons.edit_note),
-                        label: const Text('הוספת טקסט'),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _isBusy ? null : _openAddTextDialog,
+                      icon: const Icon(Icons.edit_note),
+                      label: const Text('הוספת טקסט'),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _isBusy ? null : () => _addFromImage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt_outlined),
-                        label: const Text('צילום'),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _isBusy ? null : () => _addFromImage(ImageSource.camera),
+                      icon: const Icon(Icons.camera_alt_outlined),
+                      label: const Text('צילום'),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _isBusy ? null : () => _addFromImage(ImageSource.gallery),
-                        icon: const Icon(Icons.photo_library_outlined),
-                        label: const Text('העלאה'),
-                      ),
+                    OutlinedButton.icon(
+                      onPressed: _isBusy ? null : () => _addFromImage(ImageSource.gallery),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('תמונה'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _isBusy ? null : _addFromFile,
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('קובץ PDF'),
                     ),
                   ],
                 ),
@@ -216,7 +248,7 @@ class _CurriculumNotesScreenState extends State<CurriculumNotesScreen> {
                   const SizedBox(height: 12),
                   const Center(child: CircularProgressIndicator()),
                   const SizedBox(height: 4),
-                  const Center(child: Text('קורא את התמונה...')),
+                  const Center(child: Text('קורא את הקובץ...')),
                 ],
               ],
             ),
@@ -251,9 +283,7 @@ class _CurriculumNotesScreenState extends State<CurriculumNotesScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
-                        leading: Icon(
-                          note.source == 'photo' ? Icons.photo_camera_outlined : Icons.edit_note,
-                        ),
+                        leading: Icon(_sourceIcon(note.source)),
                         title: Text(subjectLabel(note.subject)),
                         subtitle: Text(note.noteText),
                         isThreeLine: true,
