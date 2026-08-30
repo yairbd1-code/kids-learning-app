@@ -4,6 +4,7 @@ import 'screens/children_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(const KidsLearningApp());
@@ -16,7 +17,7 @@ class KidsLearningApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'אפליקציית לימוד לילדים',
-      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      theme: AppTheme.light,
       locale: const Locale('he'),
       supportedLocales: const [Locale('he')],
       localizationsDelegates: const [

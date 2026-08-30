@@ -192,21 +192,78 @@ class _RewardsScreenState extends State<RewardsScreen> {
             return const Center(child: Text('עדיין לא נוספו פרסים. לחצו על + כדי להתחיל.'));
           }
 
+          final colorScheme = Theme.of(context).colorScheme;
+
           return ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             itemCount: rewards.length,
             itemBuilder: (context, index) {
               final reward = rewards[index];
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  title: Text(reward.name),
-                  subtitle: Text('${reward.costPoints} נקודות'),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
                   onTap: () => _openRewardDialog(existing: reward),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    tooltip: 'מחיקה',
-                    onPressed: () => _deleteReward(reward),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(Icons.card_giftcard, color: colorScheme.onPrimary),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                reward.name,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star_rounded,
+                                        size: 14, color: colorScheme.onPrimaryContainer),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${reward.costPoints} נק׳',
+                                      style: TextStyle(
+                                        color: colorScheme.onPrimaryContainer,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'מחיקה',
+                          onPressed: () => _deleteReward(reward),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
