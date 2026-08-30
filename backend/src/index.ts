@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "path";
 import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth";
@@ -42,6 +43,32 @@ app.use("/me", requireChildAuth, childProfileRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+// אפליקציית ה-Flutter Web הבנויה (backend/public/, מיוצרת ידנית עם
+// flutter build web --dart-define=API_BASE_URL=... ומועתקת לכאן) מוגשת
+// מאותו שרת ומאותה כתובת - כך שלא צריך שירות Render נפרד למי שגולש לאתר.
+const publicDir = path.join(__dirname, "..", "public");
+app.use(express.static(publicDir));
+
+// כל בקשת GET שלא תאמה נתיב API ידוע ולא קובץ סטטי קיים - מניחים שזה ניווט
+// בתוך אפליקציית ה-Flutter (SPA) ומגישים לה את index.html. בדיקת התחילית
+// שומרת על 404 בפורמט JSON אמיתי לבקשות API שגויות, במקום להסוות אותן.
+const apiPathPrefixes = [
+  "/auth",
+  "/children",
+  "/rewards",
+  "/learning-tasks",
+  "/question-drafts",
+  "/practice",
+  "/store",
+  "/me",
+  "/health",
+];
+app.get(/.*/, (req, res, next) => {
+  if (req.method !== "GET") return next();
+  if (apiPathPrefixes.some((prefix) => req.path.startsWith(prefix))) return next();
+  res.sendFile(path.join(publicDir, "index.html"));
 });
 
 app.use((_req, res) => {
